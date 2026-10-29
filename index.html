@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Study Space</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=Nunito:wght@400;600;700&display=swap">
+<style>
+:root{--ink:#3a3358;--mute:#7b7498;--card:rgba(255,255,255,.82);--line:#e3dcf3;--mint:#6fbf9e;--mint2:#dff3ea;--pink:#f2a7b8;--pink2:#fde6ec;--gold:#ffd986;--vio:#8c7ae6;--bg1:#e4def7;--bg2:#fbe3ea;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#efeafc;--mute:#b3aad1;--card:rgba(40,34,70,.82);--line:#4a4278;--mint2:#24443a;--pink2:#4a2b3a;--bg1:#241f45;--bg2:#3a2440}}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;font:16px/1.5 Nunito,system-ui,sans-serif;color:var(--ink);background:linear-gradient(160deg,var(--bg1),var(--bg2));min-height:100vh}
+canvas#bg{position:fixed;inset:0;z-index:0;pointer-events:none}
+#app{position:relative;z-index:1;max-width:1040px;margin:0 auto;padding:16px}
+h1,h2,h3{font-family:Fredoka,Nunito,sans-serif;margin:0;font-weight:600}
+.card{background:var(--card);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:20px;padding:18px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.logo{font:600 24px Fredoka;display:flex;gap:8px;align-items:center}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;border-radius:12px;padding:9px 16px;background:var(--vio);color:#fff;font-weight:700}
+button.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.mint{background:var(--mint)}button.sm{padding:5px
