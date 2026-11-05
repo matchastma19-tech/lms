@@ -49,8 +49,16 @@ const SubmissionService={
 /* --- Progress & Reward Service (3 tasks per level + rank tiers) --- */
 const PETS={plant:['🌰','🌱','🌿','🪴','🌳'],pet:['🥚','🦎','🐊','🐲','🐉']};
 const MAXLV=5;
-const TIERS=['Codex Master','Wizard','Architect','Hacker'];
-const RANKS={'Newbie':{i:'⌨️',c:'#9a97c9'},'Coder':{i:'💻',c:'#3ee6a8'},'Hacker':{i:'🕹️',c:'#b388ff'},'Architect':{i:'🧱',c:'#ff8a5c'},'Wizard':{i:'🧙',c:'#ffd84a'},'Codex Master':{i:'👾',c:'#4dc9ff'}};
+/* Every 3 students get the next tier: #1-3, #4-6, #7-9, #10-12. Everyone after that who completed a task is Elite. */
+const TIERS=['Mythical Immortal','Mythical Honor','Mythic','Legend'];
+const RANKS={
+ 'Mythical Immortal':{i:'👑',c:'#ff5fb2'},
+ 'Mythical Honor':{i:'💎',c:'#4dc9ff'},
+ 'Mythic':{i:'🔥',c:'#ff8a5c'},
+ 'Legend':{i:'🏆',c:'#ffd84a'},
+ 'Elite':{i:'⚔️',c:'#3ee6a8'},
+ 'Warrior':{i:'🛡️',c:'#9a97c9'}
+};
 const RewardService={
  doneList(sid,assignedOnly){const T=Object.fromEntries(TaskService.all().map(t=>[t.id,t]));
   return Object.entries(SubmissionService.all()).filter(([k])=>k.endsWith(':'+sid)).map(([k,v])=>[T[k.split(':')[0]],v]).filter(([t])=>t&&(!assignedOnly||t.type!=='personal'))},
@@ -62,7 +70,7 @@ const RewardService={
   const rows=DashboardService.students().map(s=>{const l=RewardService.doneList(s.id,true);return{s,n:l.length,last:Math.max(0,...l.map(([,v])=>v.at))}})
    .sort((a,b)=>b.n-a.n||a.last-b.last);
   let p=0;
-  rows.forEach(r=>{if(r.n===0)r.rank='Newbie';else{r.rank=TIERS[Math.floor(p/3)]||'Coder';p++}});return rows},
+  rows.forEach(r=>{if(r.n===0)r.rank='Warrior';else{r.rank=TIERS[Math.floor(p/3)]||'Elite';p++}});return rows},
  rankOf:sid=>RewardService.ranks().find(r=>r.s.id===sid)
 };
 const badge=r=>`<span class="rank" style="--r:${RANKS[r].c}">${RANKS[r].i} ${r}</span>`;
@@ -110,7 +118,7 @@ function render(){
  const enter=S.last!==S.view;S.last=S.view;
  const stu=u.role==='student',n=RewardService.done(u.id),me=stu&&RewardService.rankOf(u.id);
  const prof=`<button class="pfbtn" onclick="profileDialog()" aria-label="Edit profile">${av(u,34)}</button>`;
- const chips=stu?`<span class="chip2">⭐ Lv ${RewardService.level(n)}</span><span class="chip2">✅ ${n}</span>${badge(me?me.rank:'Newbie')}<button class="bell" onclick="showNotes()" aria-label="Reminders">🔔<em>${NotificationService.log(u.id).length}</em></button>${prof}`
+ const chips=stu?`<span class="chip2">⭐ Lv ${RewardService.level(n)}</span><span class="chip2">✅ ${n}</span>${badge(me?me.rank:'Warrior')}<button class="bell" onclick="showNotes()" aria-label="Reminders">🔔<em>${NotificationService.log(u.id).length}</em></button>${prof}`
   :`<span class="chip2">👩‍🏫 Instructor</span><span class="chip2">📝 ${TaskService.forUser(u).length} tasks</span>${prof}`;
  $('#root').innerHTML=`<header class="nav"><a class="logo" href="#" onclick="go('dashboard');return false">&lt;SS/&gt;</a><button class="burger" aria-label="Menu" onclick="$('#menu').classList.toggle('open')">&#9776;</button>
   <nav id="menu">${nav.map(x=>`<a href="#" class="${S.view===x[0]?'active':''}" onclick="go('${x[0]}');return false">${x[2]}</a>`).join('')}</nav><div class="chips">${chips}</div></header>
@@ -162,7 +170,7 @@ function saveProfile(){const u=UserService.me(),name=$('#pn').value.trim();if(!n
  UserService.update(u.id,{name,photo:PH===undefined?u.photo:PH});dlg().close();render()}
 
 /* ---- Student home ---- */
-function studentHome(u){const s=DashboardService.student(u),n=RewardService.done(u.id),lv=RewardService.level(n),c=RewardService.choice(u.id),nx=RewardService.toNext(n),rk=(RewardService.rankOf(u.id)||{}).rank||'Newbie';
+function studentHome(u){const s=DashboardService.student(u),n=RewardService.done(u.id),lv=RewardService.level(n),c=RewardService.choice(u.id),nx=RewardService.toNext(n),rk=(RewardService.rankOf(u.id)||{}).rank||'Warrior';
  return`<div class="hero"><div class="emblem" style="--r:${RANKS[rk].c}" onclick="profileDialog()" title="Edit profile">${av(u,88)}<span class="rk">${RANKS[rk].i}</span></div>
  <div class="hinfo"><small>Welcome back</small><h2>${esc(u.name)}</h2>${badge(rk)}
  <div class="xp"><div class="bar"><i style="width:${nx?Math.round((3-nx)/3*100):100}%"></i></div><small>Level ${lv} · ${nx?`${nx} task${nx>1?'s':''} to next level`:'Max level'}</small></div></div>
@@ -211,7 +219,7 @@ function ranksView(u){const rows=RewardService.ranks(),top=rows.length>=3?[1,0,2
  return`<div class="top"><div><h2>Leaderboard</h2><p>Ranked by completed tasks. Ties go to whoever finished first.</p></div></div>
  ${top.length?`<div class="podium">${top.map(([r,p])=>`<div class="pd p${p}" style="--r:${RANKS[r.rank].c}"><div class="em">${av(r.s,48)}</div><b>${RANKS[r.rank].i} ${esc(r.s.name)}</b><small>${r.n} done</small><div class="blk">${p}</div></div>`).join('')}</div>`:''}
  <div class="card">${rows.length?rows.map((r,i)=>`<div class="row ${r.s.id===u.id?'me':''}"><div class="pos">${i+1}</div><b class="nm">${av(r.s,32)}<span>${esc(r.s.name)}</span></b><span class="meta cnt">${r.n} done</span>${badge(r.rank)}</div>`).join(''):'<div class="empty"><div class="e">🏆</div>No students yet.</div>'}</div>
- <div class="card" style="margin-top:1rem"><h3 style="margin-bottom:.8rem">How ranks work</h3><div class="meta" style="gap:.5rem">${TIERS.map((r,i)=>`${badge(r)} <span>#${i*3+1}–${i*3+3}</span>`).join('<br>')}<br>${badge('Coder')} <span>everyone else who completed a task</span><br>${badge('Newbie')} <span>no tasks completed yet</span></div></div>`}
+ <div class="card" style="margin-top:1rem"><h3 style="margin-bottom:.8rem">How ranks work</h3><div class="meta" style="gap:.5rem">${TIERS.map((r,i)=>`${badge(r)} <span>#${i*3+1}–${i*3+3}</span>`).join('<br>')}<br>${badge('Elite')} <span>everyone else who completed a task</span><br>${badge('Warrior')} <span>no tasks completed or started yet</span></div></div>`}
 
 /* ---- Instructor monitor ---- */
 function monitorView(u){const l=TaskService.sorted(TaskService.forUser(u)),rk=RewardService.ranks();
