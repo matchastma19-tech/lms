@@ -1,22 +1,29 @@
 /* STUDY SPACE - each "service" is a separate module. Today they use localStorage.
    To go real, replace each function body with fetch() calls to /api/... routes. */
+const GOOGLE_CLIENT_ID=''; // paste your Google OAuth Web Client ID here to enable real Google sign-in
 const DB={get(k,d){try{return JSON.parse(localStorage.getItem('ss_'+k))??d}catch{return d}},set(k,v){try{localStorage.setItem('ss_'+k,JSON.stringify(v))}catch{alert('Storage is full. Try smaller attachments.')}}};
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const av=(u,s=40)=>u.photo?`<img class="av" style="--s:${s}px" src="${esc(u.photo)}" alt="">`:`<span class="av" style="--s:${s}px">${esc((u.name||'?').trim()[0]||'?').toUpperCase()}</span>`;
 
-/* --- User Service (Google, email, NVSU uConnect) --- */
+/* --- User Service (Google + email, profile photo) --- */
 const UserService={
  all:()=>DB.get('users',[]),
  me:()=>UserService.all().find(u=>u.id===DB.get('session')),
+ update(id,patch){DB.set('users',UserService.all().map(u=>u.id===id?{...u,...patch}:u))},
+ wrongRole:(u,role)=>u.role!==role?{error:`This is ${u.role==='student'?'a student':'an instructor'} account. Go back and choose ${u.role==='student'?'Student':'Instructor'}.`}:null,
  register({name,email,password,role}){
   if(!name||!email||password.length<6)return{error:'Enter your name, a valid email, and a password of 6+ characters.'};
   if(UserService.all().some(u=>u.email===email))return{error:'That email already has an account. Log in instead.'};
-  const u={id:uid(),name,email,password,role,via:'email'};DB.set('users',[...UserService.all(),u]);DB.set('session',u.id);return{u}},
- login(email,password){const u=UserService.all().find(u=>u.email===email&&u.password===password);
-  if(!u)return{error:'Email or password is incorrect.'};DB.set('session',u.id);return{u}},
- sso(via,name,email,role){let u=UserService.all().find(u=>u.email===email);
-  if(!u){u={id:uid(),name,email,role,via};DB.set('users',[...UserService.all(),u])}DB.set('session',u.id);return u},
+  const u={id:uid(),name,email,password,role,via:'email',photo:''};DB.set('users',[...UserService.all(),u]);DB.set('session',u.id);return{u}},
+ login(email,password,role){const u=UserService.all().find(u=>u.email===email&&u.password===password);
+  if(!u)return{error:'Email or password is incorrect.'};
+  const w=UserService.wrongRole(u,role);if(w)return w;DB.set('session',u.id);return{u}},
+ google(name,email,photo,role){let u=UserService.all().find(u=>u.email===email);
+  if(u){const w=UserService.wrongRole(u,role);if(w)return w;if(!u.photo&&photo)UserService.update(u.id,{photo})}
+  else{u={id:uid(),name,email,role,via:'google',photo:photo||''};DB.set('users',[...UserService.all(),u])}
+  DB.set('session',u.id);return{u}},
  logout:()=>DB.set('session',null)
 };
 
@@ -87,7 +94,7 @@ const DashboardService={
 };
 
 /* ===================== UI ===================== */
-let S={view:'dashboard',last:null,filter:'all',hideDone:false,mode:'login',role:'student',err:'',barOff:false};
+let S={view:'dashboard',last:null,filter:'all',hideDone:false,mode:'login',role:null,err:'',barOff:false};
 const fmt=d=>new Date(d).toLocaleString([], {weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
 function rel(d){const ms=new Date(d)-Date.now(),a=Math.abs(ms),m=Math.round(a/6e4),h=Math.round(a/36e5),dd=Math.round(a/864e5);const t=m<60?m+' min':h<48?h+' hr':dd+' days';return ms<0?'overdue by '+t:'due in '+t}
 const urg=d=>{const ms=new Date(d)-Date.now();return ms<0?'late':ms<864e5?'soon':''};
@@ -95,42 +102,65 @@ const go=v=>{S.view=v;render()};
 
 function render(){
  const u=UserService.me();
- if(!u){S.last=null;$('#root').innerHTML=loginView();return}
+ if(!u){S.last=null;$('#root').innerHTML=S.role?authView():roleView();initGoogle();return}
  const nav=u.role==='student'?[['dashboard','🏠','Home'],['tasks','📋','Tasks'],['garden','🌱','Garden'],['ranks','🏆','Ranks']]:[['dashboard','🏠','Home'],['tasks','📋','Tasks'],['monitor','📊','Progress'],['ranks','🏆','Ranks']];
  if(!nav.some(n=>n[0]===S.view))S.view='dashboard';
  const v={dashboard:u.role==='student'?studentHome:instructorHome,tasks:tasksView,garden:gardenView,monitor:monitorView,ranks:ranksView}[S.view](u);
  const enter=S.last!==S.view;S.last=S.view;
  const stu=u.role==='student',n=RewardService.done(u.id),me=stu&&RewardService.rankOf(u.id);
- const chips=stu?`<span class="chip2">⭐ Lv ${RewardService.level(n)}</span><span class="chip2">✅ ${n}</span>${badge(me?me.rank:'Newbie')}<button class="bell" onclick="showNotes()" aria-label="Reminders">🔔<em>${NotificationService.log(u.id).length}</em></button>`
-  :`<span class="chip2">👩‍🏫 Instructor</span><span class="chip2">📝 ${TaskService.forUser(u).length} tasks</span>`;
+ const prof=`<button class="pfbtn" onclick="profileDialog()" aria-label="Edit profile">${av(u,34)}</button>`;
+ const chips=stu?`<span class="chip2">⭐ Lv ${RewardService.level(n)}</span><span class="chip2">✅ ${n}</span>${badge(me?me.rank:'Newbie')}<button class="bell" onclick="showNotes()" aria-label="Reminders">🔔<em>${NotificationService.log(u.id).length}</em></button>${prof}`
+  :`<span class="chip2">👩‍🏫 Instructor</span><span class="chip2">📝 ${TaskService.forUser(u).length} tasks</span>${prof}`;
  $('#root').innerHTML=`<div class="app"><aside><div class="brand">📚 Study Space</div>
   ${nav.map(x=>`<button class="nav ${S.view===x[0]?'on':''}" onclick="go('${x[0]}')">${x[1]} ${x[2]}</button>`).join('')}
-  <div class="who"><b>${esc(u.name)}</b><br>${stu?'Student':'Instructor'}<br><button class="btn ghost sm" style="margin-top:.6rem" onclick="logout()">Log out</button></div></aside>
+  <div class="who"><button class="pfbtn" onclick="profileDialog()">${av(u,40)}<span><b>${esc(u.name)}</b><br><small>${stu?'Student':'Instructor'}</small></span></button><button class="btn ghost sm" onclick="logout()">Log out</button></div></aside>
   <div class="col"><header class="topbar"><div class="tt">${nav.find(x=>x[0]===S.view)[2]}</div><div class="chips">${chips}</div></header>
   <main class="${enter?'enter':''}">${barHTML(u)}${v}</main></div></div>`}
-const bellBtn=u=>'';
 
-/* ---- Login ---- */
-function loginView(){const reg=S.mode==='register';
- return`<div class="login"><div class="card"><h1>📚 Study Space</h1><p style="color:var(--mute);margin:.8rem 0 0">Know what's due next. Level up while you do it.</p>
- <div class="seg"><button class="tab ${S.role==='student'?'on':''}" onclick="S.role='student';render()">Student</button><button class="tab ${S.role==='instructor'?'on':''}" onclick="S.role='instructor';render()">Instructor</button></div>
- <div class="sso" style="margin-top:.8rem"><button class="btn ghost" onclick="ssoLogin('google')">Continue with Google</button><button class="btn ghost" onclick="ssoLogin('uconnect')">Continue with NVSU uConnect</button></div><div class="or">or use email</div>
+/* ---- Sign in: choose role first, then Google or email ---- */
+function roleView(){
+ return`<div class="login"><div class="card"><h1>📚 Study Space</h1><p style="color:var(--mute);margin:.8rem 0 1.2rem">Know what's due next. Level up while you do it. Who are you?</p>
+ <div class="roles"><button class="role" onclick="pickRole('student')"><span>🎒</span><b>Student</b><small>Track deadlines, grow your pet, climb the ranks</small></button>
+ <button class="role" onclick="pickRole('instructor')"><span>👩‍🏫</span><b>Instructor</b><small>Post tasks and watch your class progress</small></button></div></div></div>`}
+const pickRole=r=>{S.role=r;S.mode='login';S.err='';render()};
+function authView(){const reg=S.mode==='register',who=S.role==='student'?'Student':'Instructor';
+ return`<div class="login"><div class="card"><button class="tab" onclick="S.role=null;S.err='';render()">← Change role</button>
+ <h1 style="margin-top:1rem">${reg?'Create':'Log in'}: ${who}</h1>
+ <div id="gbtn" class="sso" style="margin-top:1rem"></div><div class="or">or use email</div>
  ${reg?`<label for="nm">Full name</label><input id="nm" autocomplete="name">`:''}
  <label for="em">Email</label><input id="em" type="email" autocomplete="email"><label for="pw">Password</label><input id="pw" type="password" autocomplete="${reg?'new':'current'}-password">
  <div class="err">${esc(S.err)}</div>
  <button class="btn" style="width:100%" onclick="${reg?'doRegister()':'doLogin()'}">${reg?'Create account':'Log in'}</button>
- <p style="text-align:center;margin:1rem 0 0"><button class="tab" onclick="S.mode='${reg?'login':'register'}';S.err='';render()">${reg?'I have an account':'Create account'}</button> <button class="tab" onclick="loadDemo()">Try demo</button></p></div></div>`}
-function doLogin(){const r=UserService.login($('#em').value.trim(),$('#pw').value);r.error?(S.err=r.error,render()):afterLogin()}
+ <p style="text-align:center;margin:1rem 0 0"><button class="tab" onclick="S.mode='${reg?'login':'register'}';S.err='';render()">${reg?'I have an account':'Create account'}</button></p></div></div>`}
+function doLogin(){const r=UserService.login($('#em').value.trim(),$('#pw').value,S.role);r.error?(S.err=r.error,render()):afterLogin()}
 function doRegister(){const r=UserService.register({name:$('#nm').value.trim(),email:$('#em').value.trim(),password:$('#pw').value,role:S.role});r.error?(S.err=r.error,render()):afterLogin()}
-function ssoLogin(via){const label=via==='google'?'Google':'NVSU uConnect';
- const name=prompt(`Demo ${label} sign-in. Your name:`);if(!name)return;const email=prompt(`Your ${label} email:`);if(!email)return;
- UserService.sso(via,name,email.trim(),S.role);afterLogin()}
+function initGoogle(tries=0){const el=$('#gbtn');if(!el)return;
+ if(!GOOGLE_CLIENT_ID){el.innerHTML='<button class="btn ghost" onclick="googleDemo()">Continue with Google</button>';return}
+ if(!window.google){if(tries<20)setTimeout(()=>initGoogle(tries+1),250);return}
+ google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:googleDone});
+ google.accounts.id.renderButton(el,{theme:'filled_black',size:'large',text:'continue_with',width:Math.min(340,el.clientWidth||340)})}
+function googleDone(resp){try{const b=resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),p=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))));
+ const r=UserService.google(p.name||p.email,p.email,p.picture,S.role);r.error?(S.err=r.error,render()):afterLogin()}catch{S.err='Google sign-in failed. Try again.';render()}}
+function googleDemo(){const name=prompt('Demo Google sign-in (add GOOGLE_CLIENT_ID in app.js for the real thing). Your name:');if(!name)return;const email=prompt('Your Google email:');if(!email)return;
+ const r=UserService.google(name,email.trim(),'',S.role);r.error?(S.err=r.error,render()):afterLogin()}
 function afterLogin(){S.err='';S.view='dashboard';S.last=null;try{Notification.requestPermission()}catch{}render();NotificationService.tick(UserService.me())}
-function logout(){UserService.logout();render()}
+function logout(){UserService.logout();S.role=null;render()}
+
+/* ---- Profile (name + photo) ---- */
+let PH;
+const readPhoto=f=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>{const i=new Image();i.onload=()=>{const s=192,c=document.createElement('canvas');c.width=c.height=s;const m=Math.min(i.width,i.height);c.getContext('2d').drawImage(i,(i.width-m)/2,(i.height-m)/2,m,m,0,0,s,s);res(c.toDataURL('image/jpeg',.85))};i.onerror=rej;i.src=r.result};r.onerror=rej;r.readAsDataURL(f)});
+function profileDialog(){const u=UserService.me();PH=undefined;
+ dlg().innerHTML=`<h3>Your profile</h3><div class="pf"><div id="pv">${av(u,96)}</div><div class="pfa"><button class="btn ghost sm" onclick="$('#pp').click()">Upload photo</button><input id="pp" type="file" accept="image/*" hidden onchange="pickPhoto(this)"><button class="btn danger sm" onclick="removePhoto()">Remove</button></div></div>
+ <label for="pn">Name</label><input id="pn" value="${esc(u.name)}"><div class="err" id="perr"></div>
+ <div style="display:flex;gap:.5rem;justify-content:space-between;flex-wrap:wrap;margin-top:1rem"><button class="btn ghost" onclick="dlg().close();logout()">Log out</button><span style="display:flex;gap:.5rem"><button class="btn ghost" onclick="dlg().close()">Cancel</button><button class="btn" onclick="saveProfile()">Save</button></span></div>`;dlg().showModal()}
+async function pickPhoto(inp){const f=inp.files[0];if(!f)return;try{PH=await readPhoto(f);$('#pv').innerHTML=av({name:$('#pn').value,photo:PH},96);$('#perr').textContent=''}catch{$('#perr').textContent='That file is not a usable image.'}}
+function removePhoto(){PH='';$('#pv').innerHTML=av({name:$('#pn').value,photo:''},96)}
+function saveProfile(){const u=UserService.me(),name=$('#pn').value.trim();if(!name){$('#perr').textContent='Name cannot be empty.';return}
+ UserService.update(u.id,{name,photo:PH===undefined?u.photo:PH});dlg().close();render()}
 
 /* ---- Student home ---- */
 function studentHome(u){const s=DashboardService.student(u),n=RewardService.done(u.id),lv=RewardService.level(n),c=RewardService.choice(u.id),nx=RewardService.toNext(n),rk=(RewardService.rankOf(u.id)||{}).rank||'Newbie';
- return`<div class="hero"><div class="emblem" style="--r:${RANKS[rk].c}"><span>${RANKS[rk].i}</span></div>
+ return`<div class="hero"><div class="emblem" style="--r:${RANKS[rk].c}" onclick="profileDialog()" title="Edit profile">${av(u,88)}<span class="rk">${RANKS[rk].i}</span></div>
  <div class="hinfo"><small>Welcome back</small><h2>${esc(u.name)}</h2>${badge(rk)}
  <div class="xp"><div class="bar"><i style="width:${nx?Math.round((3-nx)/3*100):100}%"></i></div><small>Level ${lv} · ${nx?`${nx} task${nx>1?'s':''} to next level`:'Max level'}</small></div></div>
  <div class="pethero">${PETS[c][lv-1]}</div></div>
@@ -176,15 +206,15 @@ const pickPet=c=>{RewardService.setChoice(UserService.me().id,c);render()};
 /* ---- Ranks ---- */
 function ranksView(u){const rows=RewardService.ranks(),top=rows.length>=3?[1,0,2].map(i=>[rows[i],i+1]):[];
  return`<div class="top"><div><h2>Leaderboard</h2><p>Ranked by completed tasks. Ties go to whoever finished first.</p></div></div>
- ${top.length?`<div class="podium">${top.map(([r,p])=>`<div class="pd p${p}" style="--r:${RANKS[r.rank].c}"><div class="em">${RANKS[r.rank].i}</div><b>${esc(r.s.name)}</b><small>${r.n} done</small><div class="blk">${p}</div></div>`).join('')}</div>`:''}
- <div class="card">${rows.length?rows.map((r,i)=>`<div class="row ${r.s.id===u.id?'me':''}"><div class="pos">${i+1}</div><b>${esc(r.s.name)}</b><span class="meta cnt">${r.n} done</span>${badge(r.rank)}</div>`).join(''):'<div class="empty"><div class="e">🏆</div>No students yet.</div>'}</div>
+ ${top.length?`<div class="podium">${top.map(([r,p])=>`<div class="pd p${p}" style="--r:${RANKS[r.rank].c}"><div class="em">${av(r.s,48)}</div><b>${RANKS[r.rank].i} ${esc(r.s.name)}</b><small>${r.n} done</small><div class="blk">${p}</div></div>`).join('')}</div>`:''}
+ <div class="card">${rows.length?rows.map((r,i)=>`<div class="row ${r.s.id===u.id?'me':''}"><div class="pos">${i+1}</div><b class="nm">${av(r.s,32)}<span>${esc(r.s.name)}</span></b><span class="meta cnt">${r.n} done</span>${badge(r.rank)}</div>`).join(''):'<div class="empty"><div class="e">🏆</div>No students yet.</div>'}</div>
  <div class="card" style="margin-top:1rem"><h3 style="margin-bottom:.8rem">How ranks work</h3><div class="meta" style="gap:.5rem">${TIERS.map((r,i)=>`${badge(r)} <span>#${i*3+1}–${i*3+3}</span>`).join('<br>')}<br>${badge('Coder')} <span>everyone else who completed a task</span><br>${badge('Newbie')} <span>no tasks completed yet</span></div></div>`}
 
 /* ---- Instructor monitor ---- */
 function monitorView(u){const l=TaskService.sorted(TaskService.forUser(u)),rk=RewardService.ranks();
  return`<div class="top"><div><h2>Student progress</h2><p>See who has finished each task.</p></div></div>
  ${!rk.length?'<div class="card empty"><div class="e">🧑‍🎓</div>No students yet.</div>':`
- <div class="card"><h3 style="margin-bottom:.8rem">By student</h3>${rk.map(({s,rank})=>{const d=l.filter(t=>SubmissionService.isDone(t.id,s.id)).length,p=l.length?Math.round(d/l.length*100):0;return`<div style="margin:.8rem 0"><div style="display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap"><b>${esc(s.name)}</b>${badge(rank)}<span class="meta">${d}/${l.length} · ${p}%</span></div><div class="bar" style="margin-top:.3rem"><i style="width:${p}%"></i></div></div>`}).join('')}</div>
+ <div class="card"><h3 style="margin-bottom:.8rem">By student</h3>${rk.map(({s,rank})=>{const d=l.filter(t=>SubmissionService.isDone(t.id,s.id)).length,p=l.length?Math.round(d/l.length*100):0;return`<div style="margin:.8rem 0"><div style="display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap"><b class="nm">${av(s,28)}<span>${esc(s.name)}</span></b>${badge(rank)}<span class="meta">${d}/${l.length} · ${p}%</span></div><div class="bar" style="margin-top:.3rem"><i style="width:${p}%"></i></div></div>`}).join('')}</div>
  <div class="card table-wrap" style="margin-top:1rem"><h3 style="margin-bottom:.8rem">By task</h3><table><tr><th>Task</th><th>Due</th>${rk.map(r=>`<th>${esc(r.s.name.split(' ')[0])}</th>`).join('')}</tr>
  ${l.map(t=>`<tr><td>${esc(t.title)}</td><td>${fmt(t.due)}</td>${rk.map(({s})=>{const x=SubmissionService.get(t.id,s.id);return`<td>${x?(x.kind==='submitted'?'📎 Submitted':'✅ Done'):(new Date(t.due)<Date.now()?'⚠️ Missing':'⏳ Pending')}</td>`}).join('')}</tr>`).join('')}</table></div>`}`}
 
@@ -218,18 +248,6 @@ function celebrate(u){const n=RewardService.done(u.id),up=n>0&&n%3===0&&n<=12;re
 function showNotes(){const u=UserService.me(),l=NotificationService.log(u.id);
  dlg().innerHTML=`<h3>Reminders</h3>${l.length?l.map(n=>`<div style="padding:.5rem 0;border-bottom:2px dashed var(--line)"><b>${esc(n.title)}</b><div class="meta">${esc(n.msg)} · ${new Date(n.at).toLocaleString()}</div></div>`).join(''):'<div class="empty"><div class="e">🔕</div>No reminders yet. You get one 24 hours before a deadline and one when it arrives.</div>'}
  <div style="text-align:right;margin-top:.8rem"><button class="btn" onclick="dlg().close()">Close</button></div>`;dlg().showModal()}
-
-/* ---- Demo data ---- */
-function loadDemo(){
- const mk=(id,name,role)=>({id,name,email:id+'@demo.com',password:'demo123',role});
- const ins=mk('demo-i','Ms. Rivera','instructor'),stu=mk('demo-s','Alex Santos','student');
- const others=['Mia Cruz','Ben Lopez','Cara Reyes','Dan Uy','Ella Tan','Finn Go','Gia Lim','Hugo Sy'].map((n,i)=>mk('demo-o'+i,n,'student'));
- DB.set('users',[ins,stu,...others]);const h=36e5,n=Date.now();
- const T=[['d1','Cell Structure Quiz','quiz','Biology 101',5],['d2','Lab Report: Osmosis','assignment','Biology 101',30],['d3','Essay Outline','assignment','English 10',72],['d4','Group Presentation Practice','activity','English 10',120],['d5','Algebra Midterm','quiz','Math 9',-3],['d6','Reading Log','activity','English 10',200],['d7','Chemistry Quiz','quiz','Chem 11',-20]];
- DB.set('tasks',[...T.map(([id,title,type,course,hrs])=>({id,title,type,course,due:new Date(n+hrs*h).toISOString(),owner:ins.id,files:[]})),{id:'p1',title:'Review flashcards',type:'personal',due:new Date(n+20*h).toISOString(),owner:stu.id}]);
- const subs={'d5:demo-s':{kind:'done',at:n-5}};
- others.forEach((o,i)=>T.slice(0,Math.max(0,7-i)).forEach(([id],j)=>subs[id+':'+o.id]={kind:'done',at:n-(i*100+j)}));
- DB.set('subs',subs);DB.set('session',stu.id);DB.set('fired_demo-s',{});DB.set('notes_demo-s',[]);S.view='dashboard';S.last=null;render();NotificationService.tick(stu)}
 
 render();
 setInterval(()=>{const u=UserService.me();if(u)render(),NotificationService.tick(u)},30000);
