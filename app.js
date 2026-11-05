@@ -1,7 +1,7 @@
 /* STUDY SPACE - each "service" is a separate module. Today they use localStorage.
    To go real, replace each function body with fetch() calls to /api/... routes. */
 // Paste your Firebase web config here (Firebase console > Project settings > Your apps > Web). Free Spark plan, no card needed.
-const FIREBASE_CONFIG={apiKey:'',authDomain:'',projectId:'',appId:''};
+const FIREBASE_CONFIG={apiKey:'AIzaSyCtB7OccmirkN-OM8RldVmX3YrfAHnIgKw',authDomain:'study-space-696d4.firebaseapp.com',projectId:'study-space-696d4',appId:'1:836766198691:web:7ff3fe634cf2a8f1098816'};
 const DB={get(k,d){try{return JSON.parse(localStorage.getItem('ss_'+k))??d}catch{return d}},set(k,v){try{localStorage.setItem('ss_'+k,JSON.stringify(v))}catch{alert('Storage is full. Try smaller attachments.')}}};
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
