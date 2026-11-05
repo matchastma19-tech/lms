@@ -134,14 +134,18 @@ function authView(){const reg=S.mode==='register',who=S.role==='student'?'Studen
  <p style="text-align:center;margin:1rem 0 0"><button class="tab" onclick="S.mode='${reg?'login':'register'}';S.err='';render()">${reg?'I have an account':'Create account'}</button></p></div></div>`}
 function doLogin(){const r=UserService.login($('#em').value.trim(),$('#pw').value,S.role);r.error?(S.err=r.error,render()):afterLogin()}
 function doRegister(){const r=UserService.register({name:$('#nm').value.trim(),email:$('#em').value.trim(),password:$('#pw').value,role:S.role});r.error?(S.err=r.error,render()):afterLogin()}
+let FB;
+async function loadFB(){if(FB||!FIREBASE_CONFIG.apiKey)return FB;const V='https://www.gstatic.com/firebasejs/10.12.2/',[a,m]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js')]);FB={...m,auth:m.getAuth(a.initializeApp(FIREBASE_CONFIG))};return FB}
 function initGoogle(){const el=$('#gbtn');if(!el)return;
- el.innerHTML='<button class="btn ghost" onclick="googleSignIn()">Continue with Google</button>'+(FIREBASE_CONFIG.apiKey?'':'<p class="err">Google sign-in is not set up yet. Add FIREBASE_CONFIG at the top of app.js.</p>')}
-async function googleSignIn(){
+ el.innerHTML='<button class="btn ghost" onclick="googleSignIn()">Continue with Google</button>'+(FIREBASE_CONFIG.apiKey?'':'<p class="err">Google sign-in is not set up yet. Add FIREBASE_CONFIG at the top of app.js.</p>');
+ loadFB().catch(()=>{})} /* preload so the popup opens instantly on click (browsers block popups opened after a delay) */
+function googleDone(g){const r=UserService.google(g.displayName||g.email,g.email,g.photoURL,S.role);r.error?(S.err=r.error,render()):afterLogin()}
+function googleSignIn(){
  if(!FIREBASE_CONFIG.apiKey){S.err='Google sign-in is not set up yet. Add FIREBASE_CONFIG at the top of app.js.';render();return}
- try{const V='https://www.gstatic.com/firebasejs/10.12.2/',{initializeApp}=await import(V+'firebase-app.js'),{getAuth,GoogleAuthProvider,signInWithPopup}=await import(V+'firebase-auth.js');
-  const g=(await signInWithPopup(getAuth(initializeApp(FIREBASE_CONFIG)),new GoogleAuthProvider())).user;
-  const r=UserService.google(g.displayName||g.email,g.email,g.photoURL,S.role);r.error?(S.err=r.error,render()):afterLogin()}
- catch(e){S.err=e.code==='auth/popup-closed-by-user'?'':'Google sign-in failed ('+(e.code||e.message)+').';render()}}
+ if(!FB){S.err='Google is still loading. Try again in a moment.';render();loadFB().catch(()=>{});return}
+ FB.signInWithPopup(FB.auth,new FB.GoogleAuthProvider()).then(res=>googleDone(res.user)).catch(e=>{
+  if(e.code==='auth/popup-blocked'){DB.set('pendingRole',S.role);FB.signInWithRedirect(FB.auth,new FB.GoogleAuthProvider());return}
+  S.err=['auth/popup-closed-by-user','auth/cancelled-popup-request'].includes(e.code)?'':'Google sign-in failed ('+(e.code||e.message)+').';render()})}
 function afterLogin(){S.err='';S.view='dashboard';S.last=null;try{Notification.requestPermission()}catch{}render();NotificationService.tick(UserService.me())}
 function logout(){UserService.logout();S.role=null;render()}
 
@@ -251,3 +255,8 @@ function showNotes(){const u=UserService.me(),l=NotificationService.log(u.id);
 render();
 setInterval(()=>{const u=UserService.me();if(u)render(),NotificationService.tick(u)},30000);
 if(UserService.me())NotificationService.tick(UserService.me());
+
+/* finish a Google sign-in that used the redirect fallback */
+(async()=>{const role=DB.get('pendingRole',null);if(!role||!FIREBASE_CONFIG.apiKey)return;
+ try{await loadFB();const res=await FB.getRedirectResult(FB.auth);DB.set('pendingRole',null);if(res){S.role=role;googleDone(res.user)}}
+ catch(e){DB.set('pendingRole',null);S.role=role;S.err='Google sign-in failed ('+(e.code||e.message)+').';render()}})();
