@@ -1,11 +1,12 @@
 /* STUDY SPACE - each "service" is a separate module. Today they use localStorage.
    To go real, replace each function body with fetch() calls to /api/... routes. */
-const GOOGLE_CLIENT_ID=''; // paste your Google OAuth Web Client ID here to enable real Google sign-in
+// Paste your Firebase web config here (Firebase console > Project settings > Your apps > Web). Free Spark plan, no card needed.
+const FIREBASE_CONFIG={apiKey:'',authDomain:'',projectId:'',appId:''};
 const DB={get(k,d){try{return JSON.parse(localStorage.getItem('ss_'+k))??d}catch{return d}},set(k,v){try{localStorage.setItem('ss_'+k,JSON.stringify(v))}catch{alert('Storage is full. Try smaller attachments.')}}};
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const av=(u,s=40)=>u.photo?`<img class="av" style="--s:${s}px" src="${esc(u.photo)}" alt="">`:`<span class="av" style="--s:${s}px">${esc((u.name||'?').trim()[0]||'?').toUpperCase()}</span>`;
+const av=(u,s=40)=>u.photo?`<img class="av" style="--s:${s}px" src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`:`<span class="av" style="--s:${s}px">${esc((u.name||'?').trim()[0]||'?').toUpperCase()}</span>`;
 
 /* --- User Service (Google + email, profile photo) --- */
 const UserService={
@@ -133,15 +134,14 @@ function authView(){const reg=S.mode==='register',who=S.role==='student'?'Studen
  <p style="text-align:center;margin:1rem 0 0"><button class="tab" onclick="S.mode='${reg?'login':'register'}';S.err='';render()">${reg?'I have an account':'Create account'}</button></p></div></div>`}
 function doLogin(){const r=UserService.login($('#em').value.trim(),$('#pw').value,S.role);r.error?(S.err=r.error,render()):afterLogin()}
 function doRegister(){const r=UserService.register({name:$('#nm').value.trim(),email:$('#em').value.trim(),password:$('#pw').value,role:S.role});r.error?(S.err=r.error,render()):afterLogin()}
-function initGoogle(tries=0){const el=$('#gbtn');if(!el)return;
- if(!GOOGLE_CLIENT_ID){el.innerHTML='<button class="btn ghost" onclick="googleDemo()">Continue with Google</button>';return}
- if(!window.google){if(tries<20)setTimeout(()=>initGoogle(tries+1),250);return}
- google.accounts.id.initialize({client_id:GOOGLE_CLIENT_ID,callback:googleDone});
- google.accounts.id.renderButton(el,{theme:'filled_black',size:'large',text:'continue_with',width:Math.min(340,el.clientWidth||340)})}
-function googleDone(resp){try{const b=resp.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'),p=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(b),c=>c.charCodeAt(0))));
- const r=UserService.google(p.name||p.email,p.email,p.picture,S.role);r.error?(S.err=r.error,render()):afterLogin()}catch{S.err='Google sign-in failed. Try again.';render()}}
-function googleDemo(){const name=prompt('Demo Google sign-in (add GOOGLE_CLIENT_ID in app.js for the real thing). Your name:');if(!name)return;const email=prompt('Your Google email:');if(!email)return;
- const r=UserService.google(name,email.trim(),'',S.role);r.error?(S.err=r.error,render()):afterLogin()}
+function initGoogle(){const el=$('#gbtn');if(!el)return;
+ el.innerHTML='<button class="btn ghost" onclick="googleSignIn()">Continue with Google</button>'+(FIREBASE_CONFIG.apiKey?'':'<p class="err">Google sign-in is not set up yet. Add FIREBASE_CONFIG at the top of app.js.</p>')}
+async function googleSignIn(){
+ if(!FIREBASE_CONFIG.apiKey){S.err='Google sign-in is not set up yet. Add FIREBASE_CONFIG at the top of app.js.';render();return}
+ try{const V='https://www.gstatic.com/firebasejs/10.12.2/',{initializeApp}=await import(V+'firebase-app.js'),{getAuth,GoogleAuthProvider,signInWithPopup}=await import(V+'firebase-auth.js');
+  const g=(await signInWithPopup(getAuth(initializeApp(FIREBASE_CONFIG)),new GoogleAuthProvider())).user;
+  const r=UserService.google(g.displayName||g.email,g.email,g.photoURL,S.role);r.error?(S.err=r.error,render()):afterLogin()}
+ catch(e){S.err=e.code==='auth/popup-closed-by-user'?'':'Google sign-in failed ('+(e.code||e.message)+').';render()}}
 function afterLogin(){S.err='';S.view='dashboard';S.last=null;try{Notification.requestPermission()}catch{}render();NotificationService.tick(UserService.me())}
 function logout(){UserService.logout();S.role=null;render()}
 
