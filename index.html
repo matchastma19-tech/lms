@@ -1,36 +1,208 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Study Space</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👾</text></svg>">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
-<div class="bg" aria-hidden="true"></div>
-<canvas id="fx" aria-hidden="true"></canvas>
-<div id="root"></div>
-<div id="toasts" aria-live="polite"></div>
-<dialog id="dlg"></dialog>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<style>
+:root{--g:#34d399;--ink:#e9f3ef;--mut:#9fb6ad;--card:rgba(255,255,255,.075);--line:rgba(255,255,255,.15)}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:#07120e;min-height:100vh}
+.bg{position:fixed;inset:0;z-index:-1;overflow:hidden}
+.bg i{position:absolute;border-radius:50%;filter:blur(80px);opacity:.42;animation:fl 20s ease-in-out infinite alternate}
+.bg i:nth-child(1){width:48vw;height:48vw;background:#10b981;left:-12vw;top:-12vw}
+.bg i:nth-child(2){width:40vw;height:40vw;background:#3b82f6;right:-8vw;top:25vh;animation-delay:-7s}
+.bg i:nth-child(3){width:36vw;height:36vw;background:#a855f7;left:30vw;bottom:-16vw;animation-delay:-13s}
+@keyframes fl{to{transform:translate(9vw,6vh) scale(1.2)}}
+@media(prefers-reduced-motion:reduce){.bg i{animation:none}}
+a{color:var(--g)}h1,h2,h3{margin:.2em 0}.mut{color:var(--mut)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;backdrop-filter:blur(12px)}
+input,select,textarea{width:100%;padding:10px 12px;margin:5px 0 10px;border-radius:9px;border:1px solid var(--line);background:rgba(0,0,0,.35);color:var(--ink);font:inherit}
+label{display:block;color:var(--mut);font-size:13px}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:9px 14px;border-radius:9px;cursor:pointer;font:inherit;font-weight:600}
+.btn:hover{border-color:var(--g)}.btn:focus-visible,.tab:focus-visible,input:focus-visible{outline:2px solid var(--g)}
+.btn.p{background:var(--g);color:#05261b;border:0}.btn.g{width:100%;background:#fff;color:#222;border:0}.btn.s{padding:5px 10px;font-size:13px}.btn.d{color:#fda4af}
+.auth{max-width:400px;margin:9vh auto;text-align:center}.auth form{text-align:left}.or{margin:14px 0;color:var(--mut)}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:1px solid var(--line);background:rgba(7,18,14,.55);backdrop-filter:blur(10px);position:sticky;top:0;z-index:5}
+.logo{font-size:19px}nav{display:flex;gap:6px}.tab{background:none;border:0;color:var(--mut);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600}.tab.on{background:var(--card);color:var(--g)}
+.right{display:flex;gap:10px;align-items:center}.ic{background:none;border:0;font-size:20px;cursor:pointer;position:relative;color:var(--ink)}
+.dot{position:absolute;top:-4px;right:-6px;background:#f43f5e;border-radius:9px;font-size:11px;padding:0 5px}
+main{max-width:980px;margin:0 auto;padding:20px}.grid{display:grid;grid-template-columns:minmax(240px,300px) 1fr;gap:16px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}}
+.plant{text-align:center}.plant .em{line-height:1.1;transition:font-size .4s}
+.bar{height:9px;border-radius:9px;background:rgba(255,255,255,.12);overflow:hidden;margin:8px 0}.bar b{display:block;height:100%;background:var(--g);transition:width .5s}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:12px}.stats .card b{font-size:22px;display:block}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:14px 0}.tools .sp{flex:1}
+.task{margin-bottom:10px;display:flex;gap:12px;justify-content:space-between;flex-wrap:wrap}.task.done{opacity:.65}
+.badge{font-size:12px;padding:2px 8px;border-radius:9px;background:rgba(255,255,255,.12);margin-right:6px}
+.badge.quiz{background:#7c3aed}.badge.assignment{background:#2563eb}.badge.activity{background:#0d9488}.badge.personal{background:#b45309}
+.late{color:#fda4af}.acts{display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid var(--line);text-align:left}.me{background:rgba(52,211,153,.12)}
+details{margin-top:8px}summary{cursor:pointer;color:var(--g)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:20;padding:14px}
+.ov .card{background:#10201a;width:100%;max-width:440px;max-height:92vh;overflow:auto}
+#alarm{position:fixed;top:0;left:0;right:0;z-index:30;background:#f43f5e;color:#fff;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;font-weight:700;animation:sh .5s 3}
+@keyframes sh{25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--g);color:#05261b;padding:10px 18px;border-radius:10px;font-weight:700;z-index:40}.toast.bad{background:#f43f5e;color:#fff}
+</style></head>
+<body><div class="bg"><i></i><i></i><i></i></div><div id="app"></div>
 <script>
-/* Live background: twinkling pixels + drifting code glyphs */
-(()=>{const c=document.getElementById('fx'),x=c.getContext('2d');
-if(matchMedia('(prefers-reduced-motion:reduce)').matches){c.remove();return}
-let w,h,P=[],G=[],t=0,on=true;const dpr=Math.min(devicePixelRatio||1,2),COL=['#ffd84a','#3ee6a8','#b388ff','#4dc9ff'],GL=['{ }','</>','();','=>','[ ]','0 1','#'];
-const rs=()=>{w=innerWidth;h=innerHeight;c.width=w*dpr;c.height=h*dpr;x.setTransform(dpr,0,0,dpr,0,0)};addEventListener('resize',rs);rs();
-for(let i=0;i<Math.min(60,Math.round(w/18));i++)P.push({x:Math.floor(Math.random()*w/4)*4,y:Math.floor(Math.random()*h/4)*4,s:Math.random()<.2?8:4,p:Math.random()*6.28,c:COL[i%4]});
-const mg=()=>({x:Math.random()*w,y:h+20,v:Math.random()*.5+.3,g:GL[Math.floor(Math.random()*GL.length)],c:COL[Math.floor(Math.random()*4)]});
-for(let i=0;i<8;i++){const g=mg();g.y=Math.random()*h;G.push(g)}
-document.addEventListener('visibilitychange',()=>{on=!document.hidden;if(on)loop()});
-function loop(){if(!on)return;t++;x.clearRect(0,0,w,h);
- P.forEach(p=>{x.globalAlpha=Math.sin(t/40+p.p)>0?.7:.15;x.fillStyle=p.c;x.fillRect(p.x,p.y,p.s,p.s)});
- x.font='12px "Press Start 2P",monospace';x.globalAlpha=.16;
- G.forEach((g,i)=>{g.y-=g.v;if(g.y<-20)G[i]=mg();x.fillStyle=g.c;x.fillText(g.g,g.x,Math.round(g.y/4)*4)});
- x.globalAlpha=1;requestAnimationFrame(loop)}
-loop()})();
-</script>
-<script src="app.js"></script>
-</body>
-</html>
+/* ====== 1) PUT YOUR SUPABASE KEYS HERE (Project Settings > API) ====== */
+const SB_URL='https://tgdbijstxhielgqfpsvj.supabase.co', SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnZGJpanN0eGhpZWxncWZwc3ZqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTkyMTUsImV4cCI6MjEwODc3NTIxNX0.oiZT1HSWp_-0Qke1Ikybb2UEeIW3MmeiG_Uxp-aPeDY';
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const KINDS={activity:'Activity',assignment:'Assignment',quiz:'Quiz',personal:'Personal'};
+const PLANTS={tree:['🌱','🌿','🪴','🌳','🌲','🎄'],flower:['🌱','🌷','🌹','🌺','🌻','💐'],pet:['🥚','🐣','🐥','🐤','🦆','🦢']};
+const RANKS=['Mythical Immortal','Mythical Honor','Mythic','Legend'];
+let sb,me,tasks=[],subs=[],people=[],tab='tasks',flt='pending',notes=[],ac;
+const fd=x=>new Date(x).toLocaleString([],{dateStyle:'medium',timeStyle:'short'});
+const loc=x=>{const d=new Date(x);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)};
+const toast=(m,bad)=>{const d=document.createElement('div');d.className='toast'+(bad?' bad':'');d.textContent=m;document.body.append(d);setTimeout(()=>d.remove(),3800)};
+const close=()=>document.querySelector('.ov')?.remove();
+function modal(h){close();const o=document.createElement('div');o.className='ov';o.innerHTML=`<div class="card">${h}</div>`;o.onclick=e=>{if(e.target===o)close()};document.body.append(o)}
+async function up(f){if(!f||!f.size)return{};const p=`${me.id}/${Date.now()}-${f.name.replace(/[^\w.-]/g,'_')}`;const{error}=await sb.storage.from('files').upload(p,f);if(error)throw error;return{file_url:sb.storage.from('files').getPublicUrl(p).data.publicUrl,file_name:f.name}}
+const link=(u,n)=>u?`<a href="${esc(u)}" target="_blank" rel="noopener">📎 ${esc(n||'file')}</a>`:'';
+
+/* ---------- start ---------- */
+if(SB_URL.startsWith('YOUR_')){$('#app').innerHTML='<div class="auth card"><h2>Almost there</h2><p class="mut">Open <b>index.html</b> in a text editor and paste your Supabase URL and anon key at the top of the script.</p></div>'}
+else{sb=supabase.createClient(SB_URL,SB_KEY);
+ sb.auth.onAuthStateChange((ev,s)=>{if(ev==='TOKEN_REFRESHED'||ev==='USER_UPDATED')return;if(s&&me&&me.id===s.user.id)return;setTimeout(()=>boot(s),0)})}
+
+function authView(mode){
+ $('#app').innerHTML=`<div class="auth card"><h1>🌱 Study Space</h1><p class="mut">Keep every deadline in sight and grow a plant as you finish tasks.</p>
+ <button class="btn g" id="goog">Continue with Google</button><div class="or">or use email</div>
+ <form id="af">${mode==='up'?`<input name="name" placeholder="Full name" required><select name="role"><option value="student">I'm a student</option><option value="instructor">I'm an instructor</option></select>`:''}
+ <input name="email" type="email" placeholder="Email" required><input name="password" type="password" minlength="6" placeholder="Password (6+ characters)" required>
+ <button class="btn p" style="width:100%">${mode==='up'?'Create account':'Sign in'}</button></form>
+ <p><a href="#" id="sw">${mode==='up'?'Have an account? Sign in':'New here? Create an account'}</a></p></div>`;
+ $('#sw').onclick=e=>{e.preventDefault();authView(mode==='up'?'in':'up')};
+ $('#goog').onclick=async()=>{const{error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname}});if(error)toast(error.message,1)};
+ $('#af').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),em=f.get('email'),pw=f.get('password');
+  const r=mode==='up'?await sb.auth.signUp({email:em,password:pw,options:{data:{name:f.get('name'),role:f.get('role')}}}):await sb.auth.signInWithPassword({email:em,password:pw});
+  if(r.error)return toast(r.error.message,1);
+  if(mode==='up'&&!r.data.session)toast('Check your email to confirm your account, then sign in.')}
+}
+function roleView(u){
+ const n=u.user_metadata?.name||u.user_metadata?.full_name||'';
+ $('#app').innerHTML=`<div class="auth card"><h2>Welcome! One last step</h2><form id="rf"><input name="name" value="${esc(n)}" placeholder="Full name" required><select name="role"><option value="student">I'm a student</option><option value="instructor">I'm an instructor</option></select><button class="btn p" style="width:100%">Continue</button></form><p><a href="#" id="lo">Sign out</a></p></div>`;
+ $('#lo').onclick=e=>{e.preventDefault();sb.auth.signOut()};
+ $('#rf').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);await mkProfile(u,f.get('name'),f.get('role'))}
+}
+async function mkProfile(u,name,role){
+ const{error}=await sb.from('profiles').insert({id:u.id,name,email:u.email,role});
+ if(error)return toast(error.message,1);
+ const{data}=await sb.auth.getSession();boot(data.session)
+}
+async function boot(s){
+ if(!s){me=null;return authView('in')}
+ const u=s.user,{data:p}=await sb.from('profiles').select('*').eq('id',u.id).maybeSingle();
+ if(!p){const m=u.user_metadata||{};return m.role?mkProfile(u,m.name||u.email,m.role):roleView(u)}
+ me=p;await load();app();alerts();
+ clearInterval(window._t);window._t=setInterval(async()=>{await load();alerts();if(!document.querySelector('.ov'))app()},30000)
+}
+async function load(){
+ const[t,s,p]=await Promise.all([sb.from('tasks').select('*'),sb.from('submissions').select('*'),sb.from('profiles').select('*')]);
+ tasks=t.data||[];subs=s.data||[];people=p.data||[];me=people.find(x=>x.id===me.id)||me
+}
+
+/* ---------- helpers ---------- */
+const mySubs=()=>Object.fromEntries(subs.filter(s=>s.student_id===me.id).map(s=>[s.task_id,s]));
+const byDue=(a,b)=>new Date(a.deadline||'9999')-new Date(b.deadline||'9999');
+function ranks(){
+ const st=people.filter(p=>p.role==='student').sort((a,b)=>b.done-a.done||b.xp-a.xp||(a.name||'').localeCompare(b.name||'')),r={};let i=0;
+ st.forEach(p=>{if(p.done===0)r[p.id]='Warrior';else r[p.id]=RANKS[Math.floor(i++/3)]||'Elite'});
+ return{list:st,r}
+}
+function left(t){const d=new Date(t.deadline)-Date.now(),a=Math.abs(d),h=Math.floor(a/36e5),dy=Math.floor(h/24);
+ const s=dy?`${dy}d ${h%24}h`:h?`${h}h ${Math.floor(a%36e5/6e4)}m`:`${Math.max(1,Math.floor(a/6e4))}m`;return d<0?`<span class="late">overdue by ${s}</span>`:`in ${s}`}
+
+/* ---------- views ---------- */
+function app(){
+ const ins=me.role==='instructor',R=ranks();
+ $('#app').innerHTML=`<header><b class="logo">🌱 Study Space</b><nav>${[['tasks',ins?'Dashboard':'My tasks'],['board','Leaderboard']].map(([k,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}">${l}</button>`).join('')}</nav>
+ <div class="right"><button class="ic" data-act="bell" aria-label="Notifications">🔔${notes.length?`<span class="dot">${notes.length}</span>`:''}</button><span class="mut">${esc(me.name)} (${me.role})</span><button class="btn s" data-act="out">Sign out</button></div></header>
+ <main>${tab==='board'?board(R):ins?instr(R):stud(R)}</main>`
+}
+function taskCard(t,sub){
+ const own=t.owner_id===me.id;
+ return`<div class="card task ${sub?'done':''}"><div><span class="badge ${t.kind}">${KINDS[t.kind]}</span><b>${esc(t.title)}</b>
+ <div class="mut">${esc(t.description)}</div><div>Due ${fd(t.deadline)} · ${sub?'':left(t)}${t.max_score?` · max ${t.max_score} pts`:''} ${link(t.file_url,t.file_name)}</div>
+ ${sub?`<div style="color:var(--g)">✅ Completed ${fd(sub.submitted_at)} · +${sub.xp} XP${sub.early?' (early bonus!)':''}${sub.score!=null?` · Score: ${sub.score}${t.max_score?'/'+t.max_score:''}`:''} ${link(sub.file_url,sub.file_name)}</div>`:''}</div>
+ <div class="acts">${me.role==='student'?(sub?`<button class="btn s" data-act="undo" data-id="${sub.id}">Undo</button>`:`<button class="btn p s" data-act="done" data-id="${t.id}">Complete</button>`):''}
+ ${own?`<button class="btn s" data-act="edit" data-id="${t.id}">Edit</button><button class="btn s d" data-act="del" data-id="${t.id}">Delete</button>`:''}</div></div>`
+}
+function stud(R){
+ const my=mySubs(),set=PLANTS[me.plant]||PLANTS.tree,lvl=Math.floor(me.done/3),pr=me.done%3;
+ const list=tasks.filter(t=>flt==='all'||(flt==='done')===!!my[t.id]).sort(byDue),next=tasks.filter(t=>!my[t.id]&&new Date(t.deadline)>Date.now()).sort(byDue)[0];
+ return`<div class="grid"><div class="card plant"><div class="em" style="font-size:${60+Math.min(lvl,5)*12}px">${set[Math.min(lvl,5)]}</div>
+ <h3>Level ${lvl+1}</h3><div class="bar"><b style="width:${pr/3*100}%"></b></div><div class="mut">${pr}/3 tasks to next level</div>
+ <label>Your companion<select data-plant>${Object.keys(PLANTS).map(k=>`<option value="${k}" ${me.plant===k?'selected':''}>${PLANTS[k][5]} ${k}</option>`).join('')}</select></label></div>
+ <div><div class="stats"><div class="card"><b>${me.done}</b>completed</div><div class="card"><b>${me.xp}</b>XP</div><div class="card"><b style="font-size:16px">${R.r[me.id]||'Warrior'}</b>your rank</div></div>
+ <div class="card">${next?`<b>Up next:</b> ${esc(next.title)} · due ${fd(next.deadline)} (${left(next)})`:'🎉 Nothing due soon. Add a personal task to plan ahead.'}</div></div></div>
+ <div class="tools">${['pending','done','all'].map(f=>`<button class="tab ${flt===f?'on':''}" data-flt="${f}">${f[0].toUpperCase()+f.slice(1)}</button>`).join('')}<span class="sp"></span><button class="btn p" data-act="new">+ Personal task</button></div>
+ ${list.map(t=>taskCard(t,my[t.id])).join('')||'<div class="card mut">No tasks here yet.</div>'}`
+}
+function instr(R){
+ const mine=tasks.filter(t=>t.owner_id===me.id&&t.kind!=='personal').sort(byDue),sts=R.list;
+ return`<div class="tools"><h2>Your tasks</h2><span class="sp"></span><button class="btn p" data-act="new">+ New activity / quiz</button></div>
+ ${mine.map(t=>{const ss=subs.filter(s=>s.task_id===t.id);return`<div class="card task" style="display:block"><div class="tools" style="margin:0"><div><span class="badge ${t.kind}">${KINDS[t.kind]}</span><b>${esc(t.title)}</b><div class="mut">Due ${fd(t.deadline)} · ${left(t)} ${link(t.file_url,t.file_name)}</div></div><span class="sp"></span>
+ <b>${ss.length}/${sts.length} done</b><button class="btn s" data-act="edit" data-id="${t.id}">Edit</button><button class="btn s d" data-act="del" data-id="${t.id}">Delete</button></div>
+ <div class="bar"><b style="width:${sts.length?ss.length/sts.length*100:0}%"></b></div>
+ <details><summary>Student progress</summary><table>${sts.map(p=>{const s=ss.find(x=>x.student_id===p.id);return`<tr><td>${esc(p.name)}</td><td>${s?`✅ ${fd(s.submitted_at)}${s.early?' (early)':''}`:'⏳ Pending'}</td><td>${s&&s.score!=null?'Score '+s.score:''}</td><td>${s?link(s.file_url,s.file_name):''} ${s?.note?`<span class="mut">“${esc(s.note)}”</span>`:''}</td></tr>`}).join('')||'<tr><td class="mut">No students yet.</td></tr>'}</table></details></div>`}).join('')||'<div class="card mut">Create your first activity, assignment, or quiz.</div>'}
+ <h2 style="margin-top:22px">Students</h2>${board(R)}`
+}
+function board(R){
+ return`<div class="card"><table><tr><th>#</th><th>Student</th><th>Rank</th><th>Done</th><th>XP</th></tr>${R.list.map((p,i)=>`<tr class="${p.id===me.id?'me':''}"><td>${i+1}</td><td>${esc(p.name)}</td><td>${R.r[p.id]}</td><td>${p.done}</td><td>${p.xp}</td></tr>`).join('')||'<tr><td class="mut">No students yet.</td></tr>'}</table></div>`
+}
+
+/* ---------- forms ---------- */
+function taskForm(id){
+ const t=tasks.find(x=>x.id===id)||{},ins=me.role==='instructor';
+ modal(`<h3>${id?'Edit':'New'} ${ins?'task':'personal task'}</h3><form id="tf">${ins?`<label>Type<select name="kind">${['activity','assignment','quiz'].map(k=>`<option value="${k}" ${t.kind===k?'selected':''}>${KINDS[k]}</option>`).join('')}</select></label>`:''}
+ <input name="title" placeholder="Title" required value="${esc(t.title)}"><textarea name="description" placeholder="Description or instructions">${esc(t.description)}</textarea>
+ <label>Deadline<input name="deadline" type="datetime-local" required value="${t.deadline?loc(t.deadline):''}"></label>
+ <label>Max score (optional)<input name="max_score" type="number" min="0" value="${t.max_score??''}"></label>
+ <label>Attach a file ${t.file_name?`(current: ${esc(t.file_name)})`:''}<input name="file" type="file"></label><button class="btn p">Save task</button></form>`);
+ $('#tf').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),b=e.submitter;b.disabled=true;
+  try{const row={title:f.get('title'),description:f.get('description'),deadline:new Date(f.get('deadline')).toISOString(),max_score:f.get('max_score')?+f.get('max_score'):null,kind:ins?f.get('kind'):'personal',...await up(f.get('file'))};
+   const r=id?await sb.from('tasks').update(row).eq('id',id):await sb.from('tasks').insert({...row,owner_id:me.id});
+   if(r.error)throw r.error;close();await load();app();toast('Task saved')}catch(x){toast(x.message,1);b.disabled=false}}
+}
+function doneForm(id){
+ const t=tasks.find(x=>x.id===id);
+ modal(`<h3>Complete: ${esc(t.title)}</h3><form id="df"><label>Your score${t.max_score?` (max ${t.max_score})`:''}<input name="score" type="number" step="any" min="0" ${t.max_score?`max="${t.max_score}"`:''} placeholder="optional"></label>
+ <textarea name="note" placeholder="Note for your instructor (optional)"></textarea><label>Attach your work<input name="file" type="file"></label><button class="btn p">Mark as completed</button></form>`);
+ $('#df').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),b=e.submitter;b.disabled=true;
+  try{const was=Math.floor(me.done/3),sc=f.get('score');
+   const{data,error}=await sb.from('submissions').insert({task_id:id,student_id:me.id,score:sc===''?null:+sc,note:f.get('note')||null,...await up(f.get('file'))}).select().single();
+   if(error)throw error;close();await load();app();
+   toast(Math.floor(me.done/3)>was?`🌱 Level up! Your companion grew (+${data.xp} XP)`:`Task completed +${data.xp} XP${data.early?' (early bonus!)':''}`)}catch(x){toast(x.message,1);b.disabled=false}}
+}
+
+/* ---------- alarm reminders ---------- */
+function beep(n=3){try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();for(let i=0;i<n;i++){const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+i*.4;o.type='square';o.frequency.value=i%2?740:988;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+.25)}}catch{}}
+function ring(m){notes.unshift({m,at:new Date()});let b=$('#alarm');if(!b){b=document.createElement('div');b.id='alarm';document.body.append(b)}
+ b.innerHTML=`<span>${esc(m)}</span><button class="btn s" onclick="this.parentNode.remove()">Dismiss</button>`;beep()}
+function alerts(){
+ if(!me||me.role!=='student')return;
+ const my=mySubs(),k='ss_f_'+me.id,f=JSON.parse(localStorage[k]||'{}'),now=Date.now();
+ tasks.forEach(t=>{if(!t.deadline||my[t.id])return;const d=new Date(t.deadline)-now;
+  const st=d<=0&&d>-36e5?'due':d>0&&d<=36e5?'h1':d>36e5&&d<=864e5?'d1':null;if(!st||f[t.id+st])return;f[t.id+st]=1;
+  ring(st==='due'?`⏰ Deadline now: ${t.title}`:st==='h1'?`⚠️ Due in under an hour: ${t.title}`:`📌 Due within 24 hours: ${t.title}`)});
+ localStorage[k]=JSON.stringify(f);if(notes.length)app()
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click',async e=>{
+ try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();ac.resume()}catch{}
+ const el=e.target.closest('[data-act],[data-tab],[data-flt]');if(!el)return;const{act,id,tab:tb,flt:fl}=el.dataset;
+ if(tb){tab=tb;app()}else if(fl){flt=fl;app()}
+ else if(act==='out'){await sb.auth.signOut()}
+ else if(act==='new')taskForm();
+ else if(act==='edit')taskForm(id);
+ else if(act==='done')doneForm(id);
+ else if(act==='bell'){beep(1);modal(`<h3>Notifications</h3>${notes.map(n=>`<p>${esc(n.m)}<br><span class="mut">${n.at.toLocaleTimeString()}</span></p>`).join('')||'<p class="mut">No reminders yet. You’ll get an alarm 24 hours before, 1 hour before, and at each deadline.</p>'}`)}
+ else if(act==='del'){if(!confirm('Delete this task?'))return;const{error}=await sb.from('tasks').delete().eq('id',id);if(error)return toast(error.message,1);await load();app()}
+ else if(act==='undo'){const{error}=await sb.from('submissions').delete().eq('id',id);if(error)return toast(error.message,1);await load();app()}
+});
+document.addEventListener('change',async e=>{if(e.target.matches('[data-plant]')){const{error}=await sb.from('profiles').update({plant:e.target.value}).eq('id',me.id);if(error)return toast(error.message,1);await load();app()}});
+</script></body></html>
