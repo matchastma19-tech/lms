@@ -102,7 +102,7 @@ const go=v=>{S.view=v;render()};
 
 function render(){
  const u=UserService.me();
- if(!u){S.last=null;$('#root').innerHTML=S.role?authView():roleView();initGoogle();return}
+ if(!u){S.last=null;$('#root').innerHTML=S.role?authView():roleView();initGoogle();typeIntro();return}
  const nav=u.role==='student'?[['dashboard','🏠','Home'],['tasks','📋','Tasks'],['garden','🌱','Garden'],['ranks','🏆','Ranks']]:[['dashboard','🏠','Home'],['tasks','📋','Tasks'],['monitor','📊','Progress'],['ranks','🏆','Ranks']];
  if(!nav.some(n=>n[0]===S.view))S.view='dashboard';
  const v={dashboard:u.role==='student'?studentHome:instructorHome,tasks:tasksView,garden:gardenView,monitor:monitorView,ranks:ranksView}[S.view](u);
@@ -111,21 +111,20 @@ function render(){
  const prof=`<button class="pfbtn" onclick="profileDialog()" aria-label="Edit profile">${av(u,34)}</button>`;
  const chips=stu?`<span class="chip2">⭐ Lv ${RewardService.level(n)}</span><span class="chip2">✅ ${n}</span>${badge(me?me.rank:'Newbie')}<button class="bell" onclick="showNotes()" aria-label="Reminders">🔔<em>${NotificationService.log(u.id).length}</em></button>${prof}`
   :`<span class="chip2">👩‍🏫 Instructor</span><span class="chip2">📝 ${TaskService.forUser(u).length} tasks</span>${prof}`;
- $('#root').innerHTML=`<div class="app"><aside><div class="brand">📚 Study Space</div>
-  ${nav.map(x=>`<button class="nav ${S.view===x[0]?'on':''}" onclick="go('${x[0]}')">${x[1]} ${x[2]}</button>`).join('')}
-  <div class="who"><button class="pfbtn" onclick="profileDialog()">${av(u,40)}<span><b>${esc(u.name)}</b><br><small>${stu?'Student':'Instructor'}</small></span></button><button class="btn ghost sm" onclick="logout()">Log out</button></div></aside>
-  <div class="col"><header class="topbar"><div class="tt">${nav.find(x=>x[0]===S.view)[2]}</div><div class="chips">${chips}</div></header>
-  <main class="${enter?'enter':''}">${barHTML(u)}${v}</main></div></div>`}
+ $('#root').innerHTML=`<header class="nav"><a class="logo" href="#" onclick="go('dashboard');return false">&lt;SS/&gt;</a><button class="burger" aria-label="Menu" onclick="$('#menu').classList.toggle('open')">&#9776;</button>
+  <nav id="menu">${nav.map(x=>`<a href="#" class="${S.view===x[0]?'active':''}" onclick="go('${x[0]}');return false">${x[2]}</a>`).join('')}</nav><div class="chips">${chips}</div></header>
+  <main class="${enter?'enter':''}">${barHTML(u)}${v}</main>`}
 
 /* ---- Sign in: choose role first, then Google or email ---- */
 function roleView(){
- return`<div class="login"><div class="card"><h1>📚 Study Space</h1><p style="color:var(--mute);margin:.8rem 0 1.2rem">Know what's due next. Level up while you do it. Who are you?</p>
+ return`<div class="login"><div class="card"><p class="tag">&#9654; PLAYER 1 READY</p><h1>Study <span class="accent">Space</span></h1><p class="intro"><span id="typed"></span><span class="caret">_</span></p><p class="tag" style="margin-bottom:14px">CHOOSE YOUR CLASS</p>
  <div class="roles"><button class="role" onclick="pickRole('student')"><span>🎒</span><b>Student</b><small>Track deadlines, grow your pet, climb the ranks</small></button>
  <button class="role" onclick="pickRole('instructor')"><span>👩‍🏫</span><b>Instructor</b><small>Post tasks and watch your class progress</small></button></div></div></div>`}
+function typeIntro(){const el=$('#typed');if(!el)return;const t="Know what's due next. Level up while you do it.";if(S.typed){el.textContent=t;return}S.typed=1;let i=0;(function f(){if(i>t.length)return;el.textContent=t.slice(0,i++);setTimeout(f,35)})()}
 const pickRole=r=>{S.role=r;S.mode='login';S.err='';render()};
 function authView(){const reg=S.mode==='register',who=S.role==='student'?'Student':'Instructor';
  return`<div class="login"><div class="card"><button class="tab" onclick="S.role=null;S.err='';render()">← Change role</button>
- <h1 style="margin-top:1rem">${reg?'Create':'Log in'}: ${who}</h1>
+ <p class="tag" style="margin-top:20px">&#9654; ${who.toUpperCase()}</p><h1>${reg?'Create account':'Log in'}</h1>
  <div id="gbtn" class="sso" style="margin-top:1rem"></div><div class="or">or use email</div>
  ${reg?`<label for="nm">Full name</label><input id="nm" autocomplete="name">`:''}
  <label for="em">Email</label><input id="em" type="email" autocomplete="email"><label for="pw">Password</label><input id="pw" type="password" autocomplete="${reg?'new':'current'}-password">
